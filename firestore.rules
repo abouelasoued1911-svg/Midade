@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'email']) &&
+        data.keys().hasOnly(['userId', 'email', 'displayName', 'createdAt', 'updatedAt', 'settings']) &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.email is string && data.email.size() <= 256;
+    }
+
+    function isValidDeck(data, deckId) {
+      return data.keys().hasAll(['id', 'userId', 'name']) &&
+        data.id is string && data.id == deckId && data.id.size() <= 128 &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 256 &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+        (!('color' in data) || (data.color is string && data.color.size() <= 32)) &&
+        (!('newCardsPerDay' in data) || data.newCardsPerDay is number) &&
+        (!('reviewCardsPerDay' in data) || data.reviewCardsPerDay is number);
+    }
+
+    function isValidCard(data, cardId) {
+      return data.keys().hasAll(['id', 'userId', 'deckId', 'front', 'back', 'state']) &&
+        data.id is string && data.id == cardId && data.id.size() <= 128 &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.deckId is string && data.deckId.size() <= 128 &&
+        data.front is string && data.front.size() <= 20000 &&
+        data.back is string && data.back.size() <= 20000 &&
+        data.state is string &&
+        (!('cardType' in data) || data.cardType is string) &&
+        (!('interval' in data) || data.interval is number) &&
+        (!('easeFactor' in data) || data.easeFactor is number) &&
+        (!('repetitions' in data) || data.repetitions is number) &&
+        (!('lapses' in data) || data.lapses is number);
+    }
+
+    function isValidReviewLog(data, logId) {
+      return data.keys().hasAll(['id', 'userId', 'cardId', 'rating', 'reviewedAt']) &&
+        data.id is string && data.id == logId && data.id.size() <= 128 &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.cardId is string && data.cardId.size() <= 128 &&
+        data.rating is number &&
+        data.rating >= 1 &&
+        data.rating <= 4 &&
+        data.rating == int(data.rating);
+    }
+
+    function isValidTombstone(data, tombId) {
+      return data.keys().hasAll(['id', 'type', 'userId', 'deletedAt']) &&
+        data.id is string && data.id == tombId && data.id.size() <= 128 &&
+        data.userId is string && data.userId == request.auth.uid &&
+        (data.type == 'card' || data.type == 'deck') &&
+        data.deletedAt is string && data.deletedAt.size() <= 64;
+    }
+
+    // Health check and connection validation (Restricted to authenticated users)
+    match /test/{docId} {
+      allow read: if isSignedIn();
+    }
+
+    // Users collection (Strict PII isolation)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId) && isOwner(userId) && isValidUser(incoming());
+      allow update: if isValidId(userId) && isOwner(userId) && isValidUser(incoming()) && incoming().userId == existing().userId;
+      allow delete: if isValidId(userId) && isOwner(userId);
+    }
+
+    // Decks collection
+    match /decks/{deckId} {
+      allow get: if isValidId(deckId) && isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isValidId(deckId) && isSignedIn() && incoming().userId == request.auth.uid && isValidDeck(incoming(), deckId);
+      allow update: if isValidId(deckId) && isSignedIn() && existing().userId == request.auth.uid && incoming().userId == existing().userId && incoming().id == existing().id && isValidDeck(incoming(), deckId);
+      allow delete: if isValidId(deckId) && isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    // Cards collection
+    match /cards/{cardId} {
+      allow get: if isValidId(cardId) && isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isValidId(cardId) && isSignedIn() && incoming().userId == request.auth.uid && isValidCard(incoming(), cardId);
+      allow update: if isValidId(cardId) && isSignedIn() && existing().userId == request.auth.uid && incoming().userId == existing().userId && incoming().id == existing().id && isValidCard(incoming(), cardId);
+      allow delete: if isValidId(cardId) && isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    // Review logs collection
+    match /reviewLogs/{logId} {
+      allow get: if isValidId(logId) && isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isValidId(logId) && isSignedIn() && incoming().userId == request.auth.uid && isValidReviewLog(incoming(), logId);
+      allow update: if isValidId(logId) && isSignedIn() && existing().userId == request.auth.uid && incoming().userId == existing().userId && incoming().id == existing().id && isValidReviewLog(incoming(), logId);
+      allow delete: if isValidId(logId) && isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    // Tombstones collection for safe multi-device deletion synchronization
+    match /tombstones/{tombId} {
+      allow get: if isValidId(tombId) && isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isValidId(tombId) && isSignedIn() && incoming().userId == request.auth.uid && isValidTombstone(incoming(), tombId);
+      allow update: if isValidId(tombId) && isSignedIn() && existing().userId == request.auth.uid && incoming().userId == existing().userId && incoming().id == existing().id && isValidTombstone(incoming(), tombId);
+      allow delete: if isValidId(tombId) && isSignedIn() && existing().userId == request.auth.uid;
+    }
+  }
+}

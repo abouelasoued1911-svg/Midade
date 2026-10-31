@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="100" fill="#1976D2"/>
+  <rect x="96" y="96" width="320" height="320" rx="40" fill="#FFFFFF" opacity="0.95"/>
+  <!-- Anki Star -->
+  <polygon points="256,150 286,225 365,225 301,270 325,345 256,300 187,345 211,270 147,225 226,225" fill="#F59E0B" stroke="#D97706" stroke-width="8"/>
+</svg>

@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and sync preferences for AnkiDroid",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["userId", "email"]
+    },
+    "Deck": {
+      "title": "Deck",
+      "description": "Flashcard deck in AnkiDroid",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "color": { "type": "string", "maxLength": 32 },
+        "newCardsPerDay": { "type": "number" },
+        "reviewCardsPerDay": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "name"]
+    },
+    "Card": {
+      "title": "Card",
+      "description": "Individual flashcard with spaced repetition parameters",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "deckId": { "type": "string", "maxLength": 128 },
+        "front": { "type": "string", "maxLength": 10000 },
+        "back": { "type": "string", "maxLength": 10000 },
+        "cardType": { "type": "string", "maxLength": 32 },
+        "state": { "type": "string", "maxLength": 32 },
+        "interval": { "type": "number" },
+        "easeFactor": { "type": "number" },
+        "repetitions": { "type": "number" },
+        "lapses": { "type": "number" },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "isFlagged": { "type": "boolean" },
+        "isSuspended": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "deckId", "front", "back", "state"]
+    },
+    "ReviewLog": {
+      "title": "ReviewLog",
+      "description": "Log of card reviews for study statistics and heatmap",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "cardId": { "type": "string", "maxLength": 128 },
+        "deckId": { "type": "string", "maxLength": 128 },
+        "rating": { "type": "number" },
+        "reviewedAt": { "type": "string", "maxLength": 64 },
+        "timeSpentSeconds": { "type": "number" }
+      },
+      "required": ["id", "userId", "cardId", "rating", "reviewedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile collection"
+    },
+    "/decks/{deckId}": {
+      "schema": { "$ref": "#/entities/Deck" },
+      "description": "Flashcard decks owned by users"
+    },
+    "/cards/{cardId}": {
+      "schema": { "$ref": "#/entities/Card" },
+      "description": "Cards belonging to decks and owned by users"
+    },
+    "/reviewLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ReviewLog" },
+      "description": "Log of study sessions"
+    }
+  }
+}
